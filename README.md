@@ -138,7 +138,7 @@ Conversa, gerçek zamanlı çalışan bir pipeline gerektirir. Mobil performans�
 **Ayten Coşkun  
 
 ## How can i start my project ?
-
+cd frontend/Conversa
 npx react-native run-ios
 
 ## in a different terminal 

@@ -7,18 +7,27 @@ logger = logging.getLogger(__name__)
 @router.websocket("/ws/transcribe")
 async def transcribe_websocket(websocket: WebSocket):
     await websocket.accept()
-    logger.info("WebSocket connection established for transcription")
+    print("BACKEND: WebSocket connection established for transcription")
     
     try:
         while True:
-            # Receive binary audio data
-            data = await websocket.receive_bytes()
+            # Receive any data (text or binary)
+            print("BACKEND: Waiting for data...")
+            message = await websocket.receive()
             
-            # TODO: Process audio data (STT, Translation)
+            if "bytes" in message:
+                data = message["bytes"]
+                print(f"BACKEND: Server received BINARY: {len(data)} bytes")
+            elif "text" in message:
+                data = message["text"]
+                print(f"BACKEND: Server received TEXT: {data[:50]}...")
+            else:
+                 print(f"BACKEND: Server received UNKNOWN message type: {message.keys()}")
+
             # For now, just acknowledge receipt
-            await websocket.send_text(f"Received {len(data)} bytes")
+            await websocket.send_text("Ack")
             
     except WebSocketDisconnect:
-        logger.info("WebSocket disconnected")
+        print("BACKEND: WebSocket disconnected")
     except Exception as e:
-        logger.error(f"WebSocket error: {e}")
+        print(f"BACKEND: WebSocket error: {e}")

@@ -13,13 +13,14 @@ app.add_middleware(
 )
 
 # Include routers
-from app.api.routers import health, transcription, translation, summarization, session
+from app.api.routers import health, transcription, translation, summarization, session, auth
 
 app.include_router(health.router)
 app.include_router(transcription.router)
 app.include_router(translation.router)
 app.include_router(summarization.router)
 app.include_router(session.router)
+app.include_router(auth.router)
 
 @app.get("/")
 async def root():
