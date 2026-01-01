@@ -1,0 +1,131 @@
+import React from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+// @ts-ignore
+import Icon from 'react-native-vector-icons/Feather';
+
+import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
+import { RootStackParamList } from '../types/navigation';
+import { Meeting } from '../types/meeting';
+
+// Components (Mock data for now)
+const MOCK_HISTORY: Partial<Meeting>[] = [
+  { id: '1', title: 'Weekly Sync - Engineering', date: new Date().toISOString(), duration: 3600, status: 'completed' },
+  { id: '2', title: 'Product Design Review', date: new Date(Date.now() - 86400000).toISOString(), duration: 1800, status: 'completed' }, // Yesterday
+  { id: '3', title: 'Client Onboarding', date: new Date(Date.now() - 172800000).toISOString(), duration: 2400, status: 'processing' },
+];
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+export default function HistoryScreen() {
+  const navigation = useNavigation<NavigationProp>();
+
+  const renderItem = ({ item }: { item: Partial<Meeting> }) => (
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() => navigation.navigate('MeetingDetail', { meetingId: item.id! })}
+    >
+      <View style={styles.cardIcon}>
+        <Icon name={item.status === 'processing' ? 'loader' : 'check-circle'} size={24} color={item.status === 'processing' ? colors.secondary : colors.primary} />
+      </View>
+      <View style={styles.cardContent}>
+        <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.cardDate}>
+          {new Date(item.date!).toLocaleDateString()} • {Math.floor(item.duration! / 60)} min
+        </Text>
+      </View>
+      <Icon name="chevron-right" size={20} color={colors.textSecondary} />
+    </TouchableOpacity>
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>History</Text>
+      </View>
+
+      <FlatList
+        data={MOCK_HISTORY}
+        keyExtractor={item => item.id!}
+        renderItem={renderItem}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No conversations yet</Text>
+          </View>
+        }
+      />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  header: {
+    padding: spacing.m,
+    paddingBottom: spacing.s,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  title: {
+    fontSize: typography.sizes.l,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+  },
+  listContent: {
+    padding: spacing.m,
+  },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    padding: spacing.m,
+    borderRadius: 12,
+    marginBottom: spacing.m,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  cardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.gray,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.m,
+  },
+  cardContent: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: typography.sizes.m,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+    marginBottom: 4,
+  },
+  cardDate: {
+    fontSize: typography.sizes.s,
+    color: colors.textSecondary,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: spacing.xl * 2,
+  },
+  emptyText: {
+    fontSize: typography.sizes.m,
+    color: colors.textSecondary,
+  },
+});
