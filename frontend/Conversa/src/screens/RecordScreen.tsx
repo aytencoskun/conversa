@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform, Alert, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform, Alert, Animated, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 // @ts-ignore
@@ -23,7 +23,9 @@ export default function RecordScreen() {
   }, []);
 
   const checkPermissions = async () => {
-    const permission = Platform.OS === 'ios' ? PERMISSIONS.IOS.MICROPHONE : PERMISSIONS.ANDROID.RECORD_AUDIO;
+    // Optimized for iOS. Android permission commented out.
+    const permission = PERMISSIONS.IOS.MICROPHONE;
+    // const permission = Platform.OS === 'ios' ? PERMISSIONS.IOS.MICROPHONE : PERMISSIONS.ANDROID.RECORD_AUDIO;
     const result = await check(permission);
 
     if (result === RESULTS.GRANTED) {
@@ -38,7 +40,14 @@ export default function RecordScreen() {
     const hasPermission = await checkPermissions();
 
     if (!hasPermission) {
-      Alert.alert("Permission Denied", "Microphone permission is required to record audio.");
+      Alert.alert(
+        "Microphone Permission Required",
+        "To record audio, please allow microphone access in your device settings.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Open Settings", onPress: () => Linking.openSettings() }
+        ]
+      );
       return;
     }
 

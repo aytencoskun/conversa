@@ -80,7 +80,7 @@ export default function LoginScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior="padding" // Optimized for iOS (Android behavior: 'height' commented out)
                 style={styles.keyboardView}
             >
                 <TouchableWithoutFeedback onPress={Keyboard.dismiss}>

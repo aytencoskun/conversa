@@ -140,8 +140,11 @@ Conversa, gerçek zamanlı çalışan bir pipeline gerektirir. Mobil performans�
 ## How can i start my project ?
 cd frontend/Conversa
 npx react-native run-ios
+or 
+npx react-native run-ios --simulator="iPhone 15"
 
 ## in a different terminal 
 
 cd backend
+source venv/bin/activate
 uvicorn app.main:app --reload

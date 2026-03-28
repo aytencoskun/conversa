@@ -17,6 +17,9 @@ export class WebSocketService {
 
         console.log(`Connecting to WebSocket: ${this.url}`);
         this.socket = new WebSocket(this.url);
+        // Explicitly set binaryType to send/receive raw binary audio chunks
+        // @ts-ignore
+        this.socket.binaryType = 'arraybuffer';
 
         this.socket.onopen = () => {
             console.log('WebSocket Connected');
@@ -84,4 +87,4 @@ export class WebSocketService {
 
 // Export a singleton or allow instantiation? For now, allow instantiation but defaults could be useful.
 // Assuming backend is at localhost:8000/ws/audio or similar. User hasn't specified exact endpoint yet, using placeholder.
-export const audioWebSocket = new WebSocketService('ws://127.0.0.1:8000/ws/transcribe');
+export const audioWebSocket = new WebSocketService('ws://localhost:8000/ws/transcribe');
