@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform, Alert, Animated, Linking } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform, Alert, Animated, Linking, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 // @ts-ignore
@@ -7,6 +7,7 @@ import Icon from 'react-native-vector-icons/Feather';
 // @ts-ignore
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { audioService } from '../services/AudioService';
+import { audioWebSocket, TranscriptMessage } from '../services/WebSocketService';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 
 import { colors } from '../theme/colors';
@@ -15,6 +16,8 @@ import { typography } from '../theme/typography';
 
 export default function RecordScreen() {
   const [isRecording, setIsRecording] = useState(false);
+  const [transcribedText, setTranscribedText] = useState('');
+  const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     return () => {
@@ -52,6 +55,16 @@ export default function RecordScreen() {
     }
 
     try {
+      // Register WebSocket message handler for live transcription
+      audioWebSocket.onMessage((message: TranscriptMessage) => {
+        if (message.type === 'partial_transcript' && message.text) {
+          setTranscribedText(prev => {
+            const separator = prev.length > 0 ? ' ' : '';
+            return prev + separator + message.text;
+          });
+        }
+      });
+
       audioService.start();
       setIsRecording(true);
     } catch (e) {
@@ -61,6 +74,7 @@ export default function RecordScreen() {
   };
 
   const stopRecording = () => {
+    audioWebSocket.removeMessageHandler();
     audioService.stop();
     setIsRecording(false);
   };
@@ -106,9 +120,19 @@ export default function RecordScreen() {
 
       {/* Text Card */}
       <View style={styles.textCard}>
-        <Text style={styles.transcribedText}>
-          {isRecording ? "Listening..." : "Tap microphone to start recording."}
-        </Text>
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.textScrollView}
+          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+        >
+          <Text style={styles.transcribedText}>
+            {transcribedText
+              ? transcribedText
+              : isRecording
+                ? 'Listening...'
+                : 'Tap microphone to start recording.'}
+          </Text>
+        </ScrollView>
       </View>
 
       {/* Footer - Controls */}
@@ -230,6 +254,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 12,
     elevation: 3,
+    maxHeight: 180,
+  },
+  textScrollView: {
+    flexGrow: 0,
   },
   transcribedText: {
     fontSize: typography.sizes.m,

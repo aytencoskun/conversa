@@ -1,12 +1,31 @@
+export type TranscriptMessage = {
+    type: string;
+    text: string;
+    is_final: boolean;
+};
+
+type MessageHandler = (message: TranscriptMessage) => void;
+
 export class WebSocketService {
     private socket: WebSocket | null = null;
     private url: string;
     private isConnected: boolean = false;
 
     private messageQueue: any[] = [];
+    private onMessageHandler: MessageHandler | null = null;
 
     constructor(url: string) {
         this.url = url;
+    }
+
+    /** Register a callback to receive parsed transcript messages */
+    onMessage(handler: MessageHandler): void {
+        this.onMessageHandler = handler;
+    }
+
+    /** Remove the message handler */
+    removeMessageHandler(): void {
+        this.onMessageHandler = null;
     }
 
     connect(): void {
@@ -28,8 +47,15 @@ export class WebSocketService {
         };
 
         this.socket.onmessage = (e) => {
-            // Handle incoming messages (e.g., transcription results)
             console.log('WebSocket Message:', e.data);
+            try {
+                const message: TranscriptMessage = JSON.parse(e.data);
+                if (this.onMessageHandler) {
+                    this.onMessageHandler(message);
+                }
+            } catch (err) {
+                console.warn('WebSocket: Failed to parse message as JSON:', err);
+            }
         };
 
         this.socket.onerror = (e) => {
@@ -49,6 +75,7 @@ export class WebSocketService {
             this.socket = null;
             this.isConnected = false;
         }
+        this.onMessageHandler = null;
     }
 
     send(data: any): void {

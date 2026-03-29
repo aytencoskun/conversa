@@ -1,5 +1,6 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import logging
+import json
 from app.services.stt_service import stt_service
 from app.core.audio_utils import convert_pcm_to_float32
 import asyncio
@@ -44,7 +45,11 @@ async def transcribe_websocket(websocket: WebSocket):
                     
                     if text:
                         print(f"TRANSCRIPT: {text}")
-                        await websocket.send_text(text)
+                        await websocket.send_text(json.dumps({
+                            "type": "partial_transcript",
+                            "text": text,
+                            "is_final": False
+                        }))
                     else:
                         print("BACKEND: STT returned empty (non-speech audio, VAD filtered)")
                 except Exception as stt_error:
@@ -54,10 +59,19 @@ async def transcribe_websocket(websocket: WebSocket):
         print("BACKEND: WebSocket disconnected")
         # Final pass for trailing data buffer
         if len(audio_buffer) > 0:
-            float_audio = convert_pcm_to_float32(bytes(audio_buffer))
-            text = stt_service.transcribe_chunk(float_audio)
-            if text:
-                print(f"TRANSCRIPT (FINAL): {text}")
+            try:
+                float_audio = convert_pcm_to_float32(bytes(audio_buffer))
+                loop = asyncio.get_running_loop()
+                text = await loop.run_in_executor(None, stt_service.transcribe_chunk, float_audio)
+                if text:
+                    print(f"TRANSCRIPT (FINAL): {text}")
+                    await websocket.send_text(json.dumps({
+                        "type": "partial_transcript",
+                        "text": text,
+                        "is_final": True
+                    }))
+            except Exception as e:
+                print(f"BACKEND: Final buffer processing error: {e}")
     except Exception as e:
         print(f"BACKEND: WebSocket error: {e}")
 
