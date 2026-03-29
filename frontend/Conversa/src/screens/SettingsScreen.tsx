@@ -46,6 +46,7 @@ export default function SettingsScreen() {
   // Mock State
   const [spokenLang, setSpokenLang] = useState('English');
   const [targetLang, setTargetLang] = useState('Turkish');
+  const [translationProvider, setTranslationProvider] = useState('LibreTranslate');
   const [summaryFormat, setSummaryFormat] = useState('Bullet Points');
   const [userEmail] = useState('ayten@example.com');
   const [storageUsed] = useState('1.2 GB / 5.0 GB');
@@ -102,6 +103,19 @@ export default function SettingsScreen() {
             value={targetLang}
             onPress={() => Alert.alert('Change Target Language', 'Selector to be implemented')}
           />
+
+          <SettingItem
+            label="Translation Provider"
+            value={translationProvider}
+            onPress={() => {
+              Alert.alert('Translation Provider', 'Select a provider', [
+                { text: 'DeepL', onPress: () => setTranslationProvider('DeepL') },
+                { text: 'LibreTranslate', onPress: () => setTranslationProvider('LibreTranslate') },
+                { text: 'Cancel', style: 'cancel' },
+              ]);
+            }}
+          />
+          <Text style={styles.helperText}>DeepL (cloud) or LibreTranslate (self-hosted).</Text>
         </View>
 
         {/* Summary Format */}

@@ -7,7 +7,7 @@ import Icon from 'react-native-vector-icons/Feather';
 // @ts-ignore
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { audioService } from '../services/AudioService';
-import { audioWebSocket, TranscriptMessage } from '../services/WebSocketService';
+import { audioWebSocket, WSMessage } from '../services/WebSocketService';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 
 import { colors } from '../theme/colors';
@@ -16,12 +16,16 @@ import { typography } from '../theme/typography';
 
 export default function RecordScreen() {
   const [isRecording, setIsRecording] = useState(false);
+  const [isSessionActive, setIsSessionActive] = useState(false);
   const [transcribedText, setTranscribedText] = useState('');
-  const scrollViewRef = useRef<ScrollView>(null);
+  const [translatedText, setTranslatedText] = useState('');
+  const originalScrollRef = useRef<ScrollView>(null);
+  const translationScrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     return () => {
       stopRecording();
+      audioWebSocket.removeMessageHandler();
     };
   }, []);
 
@@ -55,15 +59,39 @@ export default function RecordScreen() {
     }
 
     try {
-      // Register WebSocket message handler for live transcription
-      audioWebSocket.onMessage((message: TranscriptMessage) => {
+      // Only clear texts if starting a completely new session
+      if (!isSessionActive) {
+        setTranscribedText('');
+        setTranslatedText('');
+        setIsSessionActive(true);
+      }
+
+      // Register WebSocket message handler for live transcription + translation
+      audioWebSocket.onMessage((message: WSMessage) => {
         if (message.type === 'partial_transcript' && message.text) {
           setTranscribedText(prev => {
             const separator = prev.length > 0 ? ' ' : '';
             return prev + separator + message.text;
           });
+        } else if (message.type === 'translation' && message.translated) {
+          setTranslatedText(prev => {
+            const separator = prev.length > 0 ? ' ' : '';
+            return prev + separator + message.translated;
+          });
         }
       });
+
+      // Send translation config to backend
+      audioWebSocket.connect();
+      // Small delay to ensure connection is established before sending config
+      setTimeout(() => {
+        audioWebSocket.sendConfig({
+          source_lang: 'EN',
+          target_lang: 'TR',
+          provider: 'libre',
+          translation_enabled: true,
+        });
+      }, 500);
 
       audioService.start();
       setIsRecording(true);
@@ -74,17 +102,22 @@ export default function RecordScreen() {
   };
 
   const stopRecording = () => {
-    audioWebSocket.removeMessageHandler();
+    // audioWebSocket.removeMessageHandler(); // REMOVED: Keep active to catch delayed background translations!
     audioService.stop();
     setIsRecording(false);
   };
 
   const handleToggleRecording = () => {
     if (isRecording) {
-      stopRecording();
+      stopRecording(); // Acts as pause
     } else {
-      startRecording();
+      startRecording(); // Acts as resume
     }
+  };
+
+  const handleDefinitiveStop = () => {
+    stopRecording();
+    setIsSessionActive(false); // Next start will clear the screen
   };
 
   return (
@@ -98,7 +131,7 @@ export default function RecordScreen() {
             <Icon name="feather" size={12} color={colors.text} style={styles.leafIcon} />
           </View>
           <View style={styles.inactiveLanguage}>
-            <Text style={styles.inactiveLanguageText}>Spanish (ES)</Text>
+            <Text style={styles.inactiveLanguageText}>Turkish (TR)</Text>
             <Icon name="chevron-down" size={16} color={colors.textSecondary} />
           </View>
         </View>
@@ -118,19 +151,23 @@ export default function RecordScreen() {
         </LinearGradient>
       </View>
 
-      {/* Text Card */}
+      {/* Single-Screen Text Card: Translation Focused */}
       <View style={styles.textCard}>
+        <View style={styles.sectionHeader}>
+          <Icon name="globe" size={16} color={colors.primary} />
+          <Text style={styles.sectionLabel}>Translation</Text>
+        </View>
         <ScrollView
-          ref={scrollViewRef}
+          ref={translationScrollRef}
           style={styles.textScrollView}
-          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+          onContentSizeChange={() => translationScrollRef.current?.scrollToEnd({ animated: true })}
         >
           <Text style={styles.transcribedText}>
-            {transcribedText
-              ? transcribedText
+            {translatedText
+              ? translatedText
               : isRecording
-                ? 'Listening...'
-                : 'Tap microphone to start recording.'}
+                ? 'Dinleniyor ve çevirisi bekleniyor... (Cümle bitiminde çevrilecektir)'
+                : 'Başlamak için mikrofona dokunun.'}
           </Text>
         </ScrollView>
       </View>
@@ -149,12 +186,12 @@ export default function RecordScreen() {
           </LinearGradient>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.controlButton} onPress={stopRecording} disabled={!isRecording}>
+        <TouchableOpacity style={styles.controlButton} onPress={handleDefinitiveStop} disabled={!isSessionActive}>
           <LinearGradient
             colors={['#9db297', '#cdae94']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={[styles.stopGradient, { opacity: isRecording ? 1 : 0.5 }]}
+            style={[styles.stopGradient, { opacity: isSessionActive ? 1 : 0.5 }]}
           >
             <Icon name="square" size={24} color="#1f341f" />
             <Text style={[styles.buttonText, styles.stopButtonText]}>Stop</Text>
@@ -212,7 +249,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-    minHeight: 300,
+    minHeight: 220,
   },
   organicBlob: {
     position: 'absolute',
@@ -221,48 +258,74 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   blob1: {
-    width: 160,
-    height: 160,
+    width: 140,
+    height: 140,
     zIndex: 3,
-    borderRadius: 80,
+    borderRadius: 70,
     justifyContent: 'center',
     alignItems: 'center',
   },
   blob2: {
-    width: 200,
-    height: 200,
-    backgroundColor: '#A3B5AC', // Lighter Sage
+    width: 175,
+    height: 175,
+    backgroundColor: '#A3B5AC',
     opacity: 0.6,
     zIndex: 2,
     transform: [{ scale: 1.1 }],
   },
   blob3: {
-    width: 240,
-    height: 240,
-    backgroundColor: '#D8C8BC', // Beige/Sand
+    width: 210,
+    height: 210,
+    backgroundColor: '#D8C8BC',
     opacity: 0.4,
     zIndex: 1,
     transform: [{ scale: 1.2 }],
   },
+  // Single-screen text card
   textCard: {
     backgroundColor: colors.surface,
-    padding: spacing.l,
+    padding: spacing.m,
     borderRadius: 24,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.m,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
     shadowRadius: 12,
     elevation: 3,
-    maxHeight: 180,
+    maxHeight: 260,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  sectionLabel: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+    color: colors.textSecondary,
+    marginLeft: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginHorizontal: spacing.m,
   },
   textScrollView: {
     flexGrow: 0,
+    maxHeight: 80,
   },
   transcribedText: {
     fontSize: typography.sizes.m,
     color: colors.text,
-    lineHeight: 24,
+    lineHeight: 22,
+  },
+  translatedText: {
+    fontSize: typography.sizes.m,
+    color: colors.primary,
+    lineHeight: 22,
+    fontStyle: 'italic',
   },
   controls: {
     flexDirection: 'row',
@@ -271,12 +334,12 @@ const styles = StyleSheet.create({
   },
   controlButton: {
     width: '48%',
-    height: 64, // Fixed height
+    height: 64,
     borderRadius: 32,
-    overflow: 'hidden', // Ensure gradient stays within bounds
+    overflow: 'hidden',
   },
   pauseGradient: {
-    flex: 1, // Fill container
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -285,7 +348,7 @@ const styles = StyleSheet.create({
     borderRadius: 32,
   },
   stopGradient: {
-    flex: 1, // Fill container
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

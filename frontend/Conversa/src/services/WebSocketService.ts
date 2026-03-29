@@ -1,10 +1,26 @@
 export type TranscriptMessage = {
-    type: string;
+    type: 'partial_transcript';
     text: string;
     is_final: boolean;
 };
 
-type MessageHandler = (message: TranscriptMessage) => void;
+export type TranslationMessage = {
+    type: 'translation';
+    original: string;
+    translated: string;
+    is_final: boolean;
+};
+
+export type WSMessage = TranscriptMessage | TranslationMessage;
+
+type MessageHandler = (message: WSMessage) => void;
+
+export type TranslationConfig = {
+    source_lang: string;
+    target_lang: string;
+    provider: string;
+    translation_enabled: boolean;
+};
 
 export class WebSocketService {
     private socket: WebSocket | null = null;
@@ -18,7 +34,7 @@ export class WebSocketService {
         this.url = url;
     }
 
-    /** Register a callback to receive parsed transcript messages */
+    /** Register a callback to receive parsed messages (transcripts + translations) */
     onMessage(handler: MessageHandler): void {
         this.onMessageHandler = handler;
     }
@@ -49,7 +65,7 @@ export class WebSocketService {
         this.socket.onmessage = (e) => {
             console.log('WebSocket Message:', e.data);
             try {
-                const message: TranscriptMessage = JSON.parse(e.data);
+                const message: WSMessage = JSON.parse(e.data);
                 if (this.onMessageHandler) {
                     this.onMessageHandler(message);
                 }
@@ -94,6 +110,15 @@ export class WebSocketService {
         }
     }
 
+    /** Send a JSON config message to configure translation on the backend */
+    sendConfig(config: TranslationConfig): void {
+        const message = JSON.stringify({
+            type: 'config',
+            ...config,
+        });
+        this.send(message);
+    }
+
     private flushQueue(): void {
         console.log(`WebSocketService: Flushing queue. Size: ${this.messageQueue.length}`);
         while (this.messageQueue.length > 0 && this.socket?.readyState === WebSocket.OPEN) {
@@ -112,6 +137,5 @@ export class WebSocketService {
     }
 }
 
-// Export a singleton or allow instantiation? For now, allow instantiation but defaults could be useful.
-// Assuming backend is at localhost:8000/ws/audio or similar. User hasn't specified exact endpoint yet, using placeholder.
+// Assuming backend is at localhost:8000/ws/audio or similar.
 export const audioWebSocket = new WebSocketService('ws://localhost:8000/ws/transcribe');
