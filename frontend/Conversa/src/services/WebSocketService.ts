@@ -11,7 +11,12 @@ export type TranslationMessage = {
     is_final: boolean;
 };
 
-export type WSMessage = TranscriptMessage | TranslationMessage;
+export type SummaryMessage = {
+    type: 'summary';
+    text: string;
+};
+
+export type WSMessage = TranscriptMessage | TranslationMessage | SummaryMessage;
 
 type MessageHandler = (message: WSMessage) => void;
 
@@ -20,6 +25,7 @@ export type TranslationConfig = {
     target_lang: string;
     provider: string;
     translation_enabled: boolean;
+    reset_session?: boolean;
 };
 
 export class WebSocketService {

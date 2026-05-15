@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform, Alert, Animated, Linking, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
+import Clipboard from '@react-native-clipboard/clipboard';
 // @ts-ignore
 import Icon from 'react-native-vector-icons/Feather';
 // @ts-ignore
@@ -19,6 +20,9 @@ export default function RecordScreen() {
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [transcribedText, setTranscribedText] = useState('');
   const [translatedText, setTranslatedText] = useState('');
+  const [direction, setDirection] = useState<'EN_TO_TR' | 'TR_TO_EN'>('EN_TO_TR');
+  const [currentSummary, setCurrentSummary] = useState('');
+  const [showSummaryPopup, setShowSummaryPopup] = useState(false);
   const originalScrollRef = useRef<ScrollView>(null);
   const translationScrollRef = useRef<ScrollView>(null);
 
@@ -41,6 +45,14 @@ export default function RecordScreen() {
 
     const requestResult = await request(permission);
     return requestResult === RESULTS.GRANTED;
+  };
+
+  const toggleDirection = () => {
+    if (isRecording) {
+      Alert.alert("Bekleyiniz", "Yönü değiştirmek için lütfen kaydı durdurun.");
+      return;
+    }
+    setDirection(prev => prev === 'EN_TO_TR' ? 'TR_TO_EN' : 'EN_TO_TR');
   };
 
   const startRecording = async () => {
@@ -78,6 +90,13 @@ export default function RecordScreen() {
             const separator = prev.length > 0 ? ' ' : '';
             return prev + separator + message.translated;
           });
+        } else if (message.type === 'summary' && message.text) {
+          setCurrentSummary(message.text);
+          setShowSummaryPopup(true);
+          // Hide popup automatically after 10 seconds
+          setTimeout(() => {
+            setShowSummaryPopup(false);
+          }, 10000);
         }
       });
 
@@ -86,10 +105,11 @@ export default function RecordScreen() {
       // Small delay to ensure connection is established before sending config
       setTimeout(() => {
         audioWebSocket.sendConfig({
-          source_lang: 'EN',
-          target_lang: 'TR',
+          source_lang: direction === 'EN_TO_TR' ? 'EN' : 'TR',
+          target_lang: direction === 'EN_TO_TR' ? 'TR' : 'EN',
           provider: 'libre',
           translation_enabled: true,
+          reset_session: !isSessionActive,
         });
       }, 500);
 
@@ -124,18 +144,34 @@ export default function RecordScreen() {
     <SafeAreaView style={styles.container}>
       {/* Header - Language Selector */}
       <View style={styles.header}>
-        <View style={styles.languagePill}>
-          <View style={styles.activeLanguage}>
-            <Icon name="globe" size={16} color={colors.text} style={styles.langIcon} />
-            <Text style={styles.activeLanguageText}>English (US)</Text>
-            <Icon name="feather" size={12} color={colors.text} style={styles.leafIcon} />
+        <TouchableOpacity style={styles.languagePill} onPress={toggleDirection} activeOpacity={0.7}>
+          <View style={direction === 'EN_TO_TR' ? styles.activeLanguage : styles.inactiveLanguage}>
+            {direction === 'EN_TO_TR' && <Icon name="globe" size={16} color={colors.text} style={styles.langIcon} />}
+            <Text style={direction === 'EN_TO_TR' ? styles.activeLanguageText : styles.inactiveLanguageText}>English (US)</Text>
           </View>
-          <View style={styles.inactiveLanguage}>
-            <Text style={styles.inactiveLanguageText}>Turkish (TR)</Text>
-            <Icon name="chevron-down" size={16} color={colors.textSecondary} />
+          
+          <Icon name="repeat" size={14} color={colors.textSecondary} style={{marginHorizontal: 4}} />
+
+          <View style={direction === 'TR_TO_EN' ? styles.activeLanguage : styles.inactiveLanguage}>
+            {direction === 'TR_TO_EN' && <Icon name="globe" size={16} color={colors.text} style={styles.langIcon} />}
+            <Text style={direction === 'TR_TO_EN' ? styles.activeLanguageText : styles.inactiveLanguageText}>Turkish (TR)</Text>
           </View>
-        </View>
+        </TouchableOpacity>
       </View>
+
+      {/* Summary Popup */}
+      {showSummaryPopup && currentSummary ? (
+        <View style={styles.summaryPopup}>
+          <View style={styles.summaryHeader}>
+            <Icon name="cpu" size={16} color="#fff" />
+            <Text style={styles.summaryTitle}>AI Ara Özet</Text>
+            <TouchableOpacity onPress={() => setShowSummaryPopup(false)} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+              <Icon name="x" size={16} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.summaryText}>{currentSummary}</Text>
+        </View>
+      ) : null}
 
       {/* Main Content - Mic Visualization */}
       <View style={styles.micContainer}>
@@ -153,9 +189,19 @@ export default function RecordScreen() {
 
       {/* Single-Screen Text Card: Translation Focused */}
       <View style={styles.textCard}>
-        <View style={styles.sectionHeader}>
-          <Icon name="globe" size={16} color={colors.primary} />
-          <Text style={styles.sectionLabel}>Translation</Text>
+        <View style={[styles.sectionHeader, { justifyContent: 'space-between' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Icon name="globe" size={16} color={colors.primary} />
+            <Text style={styles.sectionLabel}>Translation</Text>
+          </View>
+          {translatedText ? (
+            <TouchableOpacity onPress={() => {
+              Clipboard.setString(translatedText);
+              Alert.alert('Kopyalandı', 'Çeviri panoya kopyalandı!');
+            }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Icon name="copy" size={16} color={colors.primary} />
+            </TouchableOpacity>
+          ) : null}
         </View>
         <ScrollView
           ref={translationScrollRef}
@@ -166,8 +212,12 @@ export default function RecordScreen() {
             {translatedText
               ? translatedText
               : isRecording
-                ? 'Dinleniyor ve çevirisi bekleniyor... (Cümle bitiminde çevrilecektir)'
-                : 'Başlamak için mikrofona dokunun.'}
+                ? direction === 'EN_TO_TR' 
+                  ? 'Dinleniyor ve çevirisi bekleniyor... (Cümle bitiminde çevrilecektir)' 
+                  : 'Listening and waiting for translation... (Will translate at sentence end)'
+                : direction === 'EN_TO_TR' 
+                  ? 'Başlamak için mikrofona dokunun.' 
+                  : 'Tap the microphone to start.'}
           </Text>
         </ScrollView>
       </View>
@@ -366,5 +416,38 @@ const styles = StyleSheet.create({
   },
   stopButtonText: {
     color: '#1f341f',
+  },
+  summaryPopup: {
+    position: 'absolute',
+    top: 90,
+    left: spacing.m,
+    right: spacing.m,
+    backgroundColor: 'rgba(20, 48, 28, 0.95)',
+    padding: spacing.m,
+    borderRadius: 16,
+    zIndex: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  summaryTitle: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: typography.sizes.s,
+    flex: 1,
+    marginLeft: 8,
+  },
+  summaryText: {
+    color: '#E8F5E9',
+    fontSize: typography.sizes.s,
+    lineHeight: 20,
   },
 });
