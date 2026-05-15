@@ -148,3 +148,8 @@ npx react-native run-ios --simulator="iPhone 15"
 cd backend
 source venv/bin/activate
 uvicorn app.main:app --reload
+
+
+## in a different terminal 
+
+docker run -ti --rm -v libretranslate_data:/home/libretranslate/.local -p 5001:5000 libretranslate/libretranslate

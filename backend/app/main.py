@@ -1,7 +1,16 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.core.database import connect_db, close_db
 
-app = FastAPI(title="Conversa Backend")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await connect_db()
+    yield
+    await close_db()
+
+app = FastAPI(title="Conversa Backend", lifespan=lifespan)
 
 # Configure CORS
 app.add_middleware(
@@ -25,3 +34,4 @@ app.include_router(auth.router)
 @app.get("/")
 async def root():
     return {"message": "Conversa Backend is running"}
+
