@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 // @ts-ignore
 import Icon from 'react-native-vector-icons/Feather';
@@ -11,18 +11,35 @@ import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import { RootStackParamList } from '../types/navigation';
 import { Meeting } from '../types/meeting';
-
-// Components (Mock data for now)
-const MOCK_HISTORY: Partial<Meeting>[] = [
-  { id: '1', title: 'Weekly Sync - Engineering', date: new Date().toISOString(), duration: 3600, status: 'completed' },
-  { id: '2', title: 'Product Design Review', date: new Date(Date.now() - 86400000).toISOString(), duration: 1800, status: 'completed' }, // Yesterday
-  { id: '3', title: 'Client Onboarding', date: new Date(Date.now() - 172800000).toISOString(), duration: 2400, status: 'processing' },
-];
+import * as MeetingService from '../services/MeetingService';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function HistoryScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const [sessions, setSessions] = useState<Partial<Meeting>[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchSessions = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true); else setLoading(true);
+    try {
+      const data = await MeetingService.getMeetingsList();
+      setSessions(data);
+    } catch (e) {
+      console.warn('Failed to load sessions:', e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // Refresh every time the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchSessions();
+    }, [])
+  );
 
   const renderItem = ({ item }: { item: Partial<Meeting> }) => (
     <TouchableOpacity
@@ -35,12 +52,20 @@ export default function HistoryScreen() {
       <View style={styles.cardContent}>
         <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
         <Text style={styles.cardDate}>
-          {new Date(item.date!).toLocaleDateString()} • {Math.floor(item.duration! / 60)} min
+          {new Date(item.date!).toLocaleDateString()} • {Math.floor((item.duration || 0) / 60)} min
         </Text>
       </View>
       <Icon name="chevron-right" size={20} color={colors.textSecondary} />
     </TouchableOpacity>
   );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -49,10 +74,12 @@ export default function HistoryScreen() {
       </View>
 
       <FlatList
-        data={MOCK_HISTORY}
+        data={sessions}
         keyExtractor={item => item.id!}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
+        refreshing={refreshing}
+        onRefresh={() => fetchSessions(true)}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No conversations yet</Text>

@@ -1,57 +1,76 @@
 import { Meeting } from '../types/meeting';
 
-// Mock data to simulate backend response
-const MOCK_MEETING: Meeting = {
-    id: '1',
-    title: 'Weekly Sync - Engineering',
-    date: new Date().toISOString(),
-    duration: 3600, // 1 hour
-    status: 'completed',
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', // Sample audio
-    summary: {
-        topics: [
-            { id: 't1', title: 'Q1 Roadmap Review', description: 'discussed the upcoming features for Q1' },
-            { id: 't2', title: 'Performance Issues', description: 'addressed latency in the API' },
-        ],
-        decisions: [
-            { id: 'd1', description: 'Adopt React Native for mobile app' },
-            { id: 'd2', description: 'Migrate to PostgreSQL' },
-        ],
-        actionItems: [
-            { id: 'a1', description: 'Create Jira tickets for roadmap', assignee: 'John', isCompleted: false },
-            { id: 'a2', description: 'Benchmark DB queries', assignee: 'Jane', isCompleted: true },
-        ],
-    },
-    transcript: [
-        { id: 'tr1', speakerId: 's1', speakerName: 'Alice', startTime: 0, endTime: 5, text: 'Hello everyone, let\'s start.' },
-        { id: 'tr2', speakerId: 's2', speakerName: 'Bob', startTime: 6, endTime: 12, text: 'Sure, I have the updates ready.' },
-        { id: 'tr3', speakerId: 's1', speakerName: 'Alice', startTime: 13, endTime: 20, text: 'Great, please go ahead.' },
-        { id: 'tr4', speakerId: 's2', speakerName: 'Bob', startTime: 21, endTime: 45, text: 'We have completed the initial phase of the migration. However, we are facing some issues with the legacy data format.' },
-    ],
-    translation: [
-        { id: 'tr1', originalText: 'Hello everyone, let\'s start.', translatedText: 'Herkese merhaba, başlayalım.' },
-        { id: 'tr2', originalText: 'Sure, I have the updates ready.', translatedText: 'Tabii, güncellemeler hazır.' },
-        { id: 'tr3', originalText: 'Great, please go ahead.', translatedText: 'Harika, lütfen devam et.' },
-        { id: 'tr4', originalText: 'We have completed the initial phase of the migration. However, we are facing some issues with the legacy data format.', translatedText: 'Göçün ilk aşamasını tamamladık. Ancak, eski veri formatıyla ilgili bazı sorunlarla karşı karşıyayız.' },
-    ]
+const API_BASE_URL = 'http://localhost:8000';
+
+/**
+ * Map a backend session document to the frontend Meeting type.
+ * The backend stores fields like `created_at`, `transcript[].original`, etc.
+ * that need slight re-mapping to match the existing UI expectations.
+ */
+function mapSessionToMeeting(session: any): Meeting {
+    return {
+        id: session.id,
+        title: session.title || 'Untitled Meeting',
+        date: session.created_at || new Date().toISOString(),
+        duration: session.duration || 0,
+        status: session.status || 'completed',
+        source_lang: session.source_lang,
+        target_lang: session.target_lang,
+        // Map transcript — backend stores { id, text, timestamp }
+        transcript: session.transcript?.map((seg: any) => ({
+            id: seg.id,
+            speakerId: 'default',
+            speakerName: 'Speaker',
+            startTime: seg.timestamp ?? 0,
+            endTime: seg.timestamp ?? 0,
+            text: seg.text,
+            timestamp: seg.timestamp,
+        })),
+        // Map translation — backend stores { id, original, translated, timestamp }
+        translation: session.translation?.map((seg: any) => ({
+            id: seg.id,
+            originalText: seg.original,
+            translatedText: seg.translated,
+            timestamp: seg.timestamp,
+        })),
+        // Summary already matches MeetingSummary shape (topics, decisions, actionItems, paragraph, bulletPoints)
+        summary: session.summary,
+    };
+}
+
+export const getMeetingsList = async (): Promise<Partial<Meeting>[]> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/session/list`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const sessions = await response.json();
+        return sessions.map((s: any) => ({
+            id: s.id,
+            title: s.title || 'Untitled Meeting',
+            date: s.created_at || new Date().toISOString(),
+            duration: s.duration || 0,
+            status: s.status || 'completed',
+        }));
+    } catch (e) {
+        console.warn('Failed to fetch sessions from backend, returning empty list:', e);
+        return [];
+    }
 };
 
 export const getMeetingDetails = async (meetingId: string): Promise<Meeting> => {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(() => resolve(undefined), 500));
-
-    return {
-        ...MOCK_MEETING,
-        id: meetingId,
-    };
+    const response = await fetch(`${API_BASE_URL}/session/${meetingId}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const session = await response.json();
+    return mapSessionToMeeting(session);
 };
 
 export const updateMeetingTitle = async (meetingId: string, newTitle: string): Promise<void> => {
-    await new Promise(resolve => setTimeout(() => resolve(undefined), 300));
-    console.log(`Updated meeting ${meetingId} title to: ${newTitle}`);
+    await fetch(`${API_BASE_URL}/session/${meetingId}/title?title=${encodeURIComponent(newTitle)}`, {
+        method: 'PATCH',
+    });
 };
 
 export const deleteMeeting = async (meetingId: string): Promise<void> => {
-    await new Promise(resolve => setTimeout(() => resolve(undefined), 300));
-    console.log(`Deleted meeting ${meetingId}`);
+    await fetch(`${API_BASE_URL}/session/${meetingId}`, {
+        method: 'DELETE',
+    });
 };

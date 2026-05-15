@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, ActivityIndicator, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import Clipboard from '@react-native-clipboard/clipboard';
 // @ts-ignore
 import Icon from 'react-native-vector-icons/Feather';
 // @ts-ignore
@@ -79,48 +80,123 @@ const AudioPlayer = ({ duration, audioUrl }: { duration: number, audioUrl?: stri
 };
 
 const SummaryTab = ({ summary }: { summary?: MeetingSummary }) => {
+    const [viewMode, setViewMode] = useState<'structured' | 'paragraph' | 'bullets'>('structured');
+    const [length, setLength] = useState<'short' | 'medium' | 'long'>('medium');
+
     if (!summary) return <Text style={styles.emptyText}>No summary available.</Text>;
+
+    const ViewModeButton = ({ mode, label }: { mode: typeof viewMode; label: string }) => (
+        <TouchableOpacity
+            style={[styles.chipButton, viewMode === mode && styles.chipButtonActive]}
+            onPress={() => setViewMode(mode)}
+        >
+            <Text style={[styles.chipText, viewMode === mode && styles.chipTextActive]}>{label}</Text>
+        </TouchableOpacity>
+    );
+
+    const LengthButton = ({ len, label }: { len: typeof length; label: string }) => (
+        <TouchableOpacity
+            style={[styles.chipButtonSmall, length === len && styles.chipButtonSmallActive]}
+            onPress={() => setLength(len)}
+        >
+            <Text style={[styles.chipTextSmall, length === len && styles.chipTextSmallActive]}>{label}</Text>
+        </TouchableOpacity>
+    );
 
     return (
         <ScrollView style={styles.tabContent} contentContainerStyle={{ paddingBottom: 100 }}>
-            <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                    <Icon name="list" size={20} color={colors.primary} />
-                    <Text style={styles.cardTitle}>Topics</Text>
-                </View>
-                {summary.topics.map((item) => (
-                    <View key={item.id} style={styles.listItem}>
-                        <Text style={styles.itemTitle}>• {item.title}</Text>
-                        {item.description && <Text style={styles.itemDesc}>{item.description}</Text>}
-                    </View>
-                ))}
+            {/* View Mode Selector */}
+            <View style={styles.chipRow}>
+                <ViewModeButton mode="structured" label="📋 Structured" />
+                <ViewModeButton mode="paragraph" label="📝 Paragraph" />
+                <ViewModeButton mode="bullets" label="🔹 Bullets" />
             </View>
 
-            <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                    <Icon name="check-circle" size={20} color={colors.secondary} />
-                    <Text style={styles.cardTitle}>Decisions</Text>
+            {/* Length Selector — only for paragraph/bullets */}
+            {viewMode !== 'structured' && (
+                <View style={[styles.chipRow, { marginTop: 8 }]}>  
+                    <LengthButton len="short" label="Short" />
+                    <LengthButton len="medium" label="Medium" />
+                    <LengthButton len="long" label="Long" />
                 </View>
-                {summary.decisions.map((item) => (
-                    <View key={item.id} style={styles.listItem}>
-                        <Text style={styles.itemText}>✅ {item.description}</Text>
-                    </View>
-                ))}
-            </View>
+            )}
 
-            <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                    <Icon name="zap" size={20} color={colors.error} />
-                    <Text style={styles.cardTitle}>Action Items</Text>
-                </View>
-                {summary.actionItems.map((item) => (
-                    <View key={item.id} style={styles.listItem}>
-                        <Text style={[styles.itemText, item.isCompleted && styles.completedText]}>
-                            🚀 {item.description} {item.assignee && <Text style={styles.assignee}>@{item.assignee}</Text>}
-                        </Text>
+            {/* ── Structured View (Topics / Decisions / Action Items) ── */}
+            {viewMode === 'structured' && (
+                <>
+                    <View style={styles.card}>
+                        <View style={styles.cardHeader}>
+                            <Icon name="list" size={20} color={colors.primary} />
+                            <Text style={styles.cardTitle}>Topics</Text>
+                        </View>
+                        {summary.topics.length > 0 ? summary.topics.map((item) => (
+                            <View key={item.id} style={styles.listItem}>
+                                <Text style={styles.itemTitle}>• {item.title}</Text>
+                                {item.description && <Text style={styles.itemDesc}>{item.description}</Text>}
+                            </View>
+                        )) : <Text style={styles.itemDesc}>No topics detected.</Text>}
                     </View>
-                ))}
-            </View>
+
+                    <View style={styles.card}>
+                        <View style={styles.cardHeader}>
+                            <Icon name="check-circle" size={20} color={colors.secondary} />
+                            <Text style={styles.cardTitle}>Decisions</Text>
+                        </View>
+                        {summary.decisions.length > 0 ? summary.decisions.map((item) => (
+                            <View key={item.id} style={styles.listItem}>
+                                <Text style={styles.itemText}>✅ {item.description}</Text>
+                            </View>
+                        )) : <Text style={styles.itemDesc}>No decisions detected.</Text>}
+                    </View>
+
+                    <View style={styles.card}>
+                        <View style={styles.cardHeader}>
+                            <Icon name="zap" size={20} color={colors.error} />
+                            <Text style={styles.cardTitle}>Action Items</Text>
+                        </View>
+                        {summary.actionItems.length > 0 ? summary.actionItems.map((item) => (
+                            <View key={item.id} style={styles.listItem}>
+                                <Text style={[styles.itemText, item.isCompleted && styles.completedText]}>
+                                    🚀 {item.description} {item.assignee && <Text style={styles.assignee}>@{item.assignee}</Text>}
+                                </Text>
+                            </View>
+                        )) : <Text style={styles.itemDesc}>No action items detected.</Text>}
+                    </View>
+                </>
+            )}
+
+            {/* ── Paragraph View ── */}
+            {viewMode === 'paragraph' && (
+                <View style={styles.card}>
+                    <View style={styles.cardHeader}>
+                        <Icon name="file-text" size={20} color={colors.primary} />
+                        <Text style={styles.cardTitle}>Summary — {length.charAt(0).toUpperCase() + length.slice(1)}</Text>
+                    </View>
+                    <Text style={styles.paragraphText}>
+                        {summary.paragraph?.[length] || 'Paragraph summary not available for this session.'}
+                    </Text>
+                </View>
+            )}
+
+            {/* ── Bullet Points View ── */}
+            {viewMode === 'bullets' && (
+                <View style={styles.card}>
+                    <View style={styles.cardHeader}>
+                        <Icon name="list" size={20} color={colors.primary} />
+                        <Text style={styles.cardTitle}>Key Points — {length.charAt(0).toUpperCase() + length.slice(1)}</Text>
+                    </View>
+                    {(summary.bulletPoints?.[length] || []).length > 0 ? (
+                        summary.bulletPoints![length].map((bullet, idx) => (
+                            <View key={idx} style={styles.bulletItem}>
+                                <Text style={styles.bulletDot}>•</Text>
+                                <Text style={styles.bulletText}>{bullet}</Text>
+                            </View>
+                        ))
+                    ) : (
+                        <Text style={styles.itemDesc}>Bullet summary not available for this session.</Text>
+                    )}
+                </View>
+            )}
         </ScrollView>
     );
 };
@@ -149,10 +225,10 @@ const TranscriptTab = ({ transcript }: { transcript?: TranscriptSegment[] }) => 
                     <View style={styles.transcriptItem}>
                         <View style={styles.speakerInfo}>
                             <View style={styles.avatar}>
-                                <Text style={styles.avatarText}>{item.speakerName[0]}</Text>
+                                <Text style={styles.avatarText}>{(item.speakerName ?? 'S')[0]}</Text>
                             </View>
-                            <Text style={styles.speakerName}>{item.speakerName}</Text>
-                            <Text style={styles.timestamp}>{Math.floor(item.startTime / 60)}:{Math.floor(item.startTime % 60).toString().padStart(2, '0')}</Text>
+                            <Text style={styles.speakerName}>{item.speakerName ?? 'Speaker'}</Text>
+                            <Text style={styles.timestamp}>{Math.floor((item.startTime ?? 0) / 60)}:{Math.floor((item.startTime ?? 0) % 60).toString().padStart(2, '0')}</Text>
                         </View>
                         <Text style={styles.transcriptText}>{item.text}</Text>
                     </View>
@@ -171,7 +247,15 @@ const TranslationTab = ({ translation, transcript }: { translation?: Translation
                     <Text style={styles.originalTextLabel}>Original:</Text>
                     <Text style={styles.originalText}>{item.originalText}</Text>
                     <View style={styles.separator} />
-                    <Text style={styles.translatedTextLabel}>Translated:</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                        <Text style={[styles.translatedTextLabel, { marginBottom: 0 }]}>Translated:</Text>
+                        <TouchableOpacity onPress={() => {
+                            Clipboard.setString(item.translatedText);
+                            Alert.alert('Kopyalandı', 'Çeviri panoya kopyalandı!');
+                        }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                            <Icon name="copy" size={14} color={colors.primary} />
+                        </TouchableOpacity>
+                    </View>
                     <Text style={styles.translatedText}>{item.translatedText}</Text>
                 </View>
             ))}
@@ -571,5 +655,70 @@ const styles = StyleSheet.create({
         elevation: 4,
         borderWidth: 1,
         borderColor: colors.error,
-    }
+    },
+    // ── Chip / Toggle Styles ──
+    chipRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 12,
+    },
+    chipButton: {
+        paddingVertical: 8,
+        paddingHorizontal: 14,
+        borderRadius: 20,
+        backgroundColor: colors.gray,
+    },
+    chipButtonActive: {
+        backgroundColor: colors.primary,
+    },
+    chipText: {
+        fontSize: typography.sizes.xs,
+        color: colors.textSecondary,
+        fontWeight: typography.weights.medium,
+    },
+    chipTextActive: {
+        color: colors.onPrimary,
+    },
+    chipButtonSmall: {
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    chipButtonSmallActive: {
+        borderColor: colors.primary,
+        backgroundColor: colors.primaryVariant,
+    },
+    chipTextSmall: {
+        fontSize: typography.sizes.xs,
+        color: colors.textSecondary,
+    },
+    chipTextSmallActive: {
+        color: colors.primary,
+        fontWeight: typography.weights.bold,
+    },
+    // ── Paragraph / Bullet Styles ──
+    paragraphText: {
+        fontSize: typography.sizes.s,
+        color: colors.text,
+        lineHeight: 22,
+    },
+    bulletItem: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginBottom: 8,
+    },
+    bulletDot: {
+        fontSize: typography.sizes.m,
+        color: colors.primary,
+        marginRight: 8,
+        lineHeight: 22,
+    },
+    bulletText: {
+        flex: 1,
+        fontSize: typography.sizes.s,
+        color: colors.text,
+        lineHeight: 22,
+    },
 });

@@ -1,10 +1,11 @@
 export interface TranscriptSegment {
     id: string;
-    speakerId: string;
-    speakerName: string;
-    startTime: number;
-    endTime: number;
+    speakerId?: string;
+    speakerName?: string;
+    startTime?: number;
+    endTime?: number;
     text: string;
+    timestamp?: number; // seconds elapsed since session start
 }
 
 export interface SummaryActionItem {
@@ -25,17 +26,32 @@ export interface SummaryTopic {
     description?: string;
 }
 
+export interface LengthVariants {
+    short: string;
+    medium: string;
+    long: string;
+}
+
+export interface BulletVariants {
+    short: string[];
+    medium: string[];
+    long: string[];
+}
+
 export interface MeetingSummary {
     topics: SummaryTopic[];
     decisions: SummaryDecision[];
     actionItems: SummaryActionItem[];
     fullText?: string;
+    paragraph?: LengthVariants;
+    bulletPoints?: BulletVariants;
 }
 
 export interface TranslationSegment {
     id: string; // Should match transcript segment id
     translatedText: string;
     originalText: string;
+    timestamp?: number;
 }
 
 export interface Meeting {
@@ -44,6 +60,8 @@ export interface Meeting {
     date: string; // ISO string
     duration: number; // in seconds
     audioUrl?: string; // Firebase storage URL
+    source_lang?: string;
+    target_lang?: string;
 
     // These might be loaded lazily, but for now we include them
     transcript?: TranscriptSegment[];
@@ -52,3 +70,4 @@ export interface Meeting {
 
     status: 'processing' | 'completed' | 'failed';
 }
+
