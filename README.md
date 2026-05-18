@@ -153,3 +153,26 @@ uvicorn app.main:app --reload
 ## in a different terminal 
 
 docker run -ti --rm -v libretranslate_data:/home/libretranslate/.local -p 5001:5000 libretranslate/libretranslate
+
+## new start commands
+
+docker-compose up --build
+
+## in a different terminal 
+
+cd backend
+source venv/bin/activate
+uvicorn app.main:app --reload
+
+## in a different terminal 
+
+docker run -ti --rm -v libretranslate_data:/home/libretranslate/.local -p 5001:5000 libretranslate/libretranslate
+
+## new start commands
+
+docker-compose up --build
+
+## then 
+
+cd frontend/Conversa
+npx react-native run-ios

@@ -143,5 +143,5 @@ export class WebSocketService {
     }
 }
 
-// Assuming backend is at localhost:8000/ws/audio or similar.
-export const audioWebSocket = new WebSocketService('ws://localhost:8000/ws/transcribe');
+// Backend WebSocket endpoint
+export const audioWebSocket = new WebSocketService('ws://192.168.1.174:8000/ws/transcribe');

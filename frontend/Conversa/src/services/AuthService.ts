@@ -11,9 +11,9 @@
 
 import { TokenStorage, StoredUser } from './TokenStorage';
 
-// ─── Backend base URL ────────────────────────────────────────────────────────
-// Simulator için localhost, gerçek cihazda Mac'in IP'si ile değiştir
-const BASE_URL = 'http://localhost:8000';
+// Simulator: 'http://localhost:8000'
+// Gerçek cihaz (aynı WiFi): Mac IP'ni kullan
+const BASE_URL = 'http://192.168.1.174:8000';
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
 
@@ -66,14 +66,27 @@ class AuthService {
 
   // ── Email / Password ────────────────────────────────────────────────────────
 
-  async signup(email: string, password: string, displayName?: string): Promise<boolean> {
-    const { access_token } = await post<{ access_token: string }>('/auth/signup', {
+  async signup(email: string, password: string, displayName?: string): Promise<string> {
+    const { message } = await post<{ message: string }>('/auth/signup', {
       email,
       password,
       display_name: displayName,
     });
+    return message; // "Verification code sent to your email"
+  }
+
+  async verifyCode(email: string, code: string): Promise<boolean> {
+    const { access_token } = await post<{ access_token: string }>('/auth/verify-code', {
+      email,
+      code,
+    });
     await this._finalizeLogin(access_token);
     return true;
+  }
+
+  async resendCode(email: string): Promise<string> {
+    const { message } = await post<{ message: string }>('/auth/resend-code', { email });
+    return message;
   }
 
   async login(email: string, password: string): Promise<boolean> {
@@ -92,22 +105,29 @@ class AuthService {
       const { GoogleSignin } = await import('@react-native-google-signin/google-signin');
 
       GoogleSignin.configure({
-        // web client ID from Firebase Console → Project Settings → Web API Key
-        webClientId: 'REPLACE_WITH_FIREBASE_WEB_CLIENT_ID',
+        iosClientId: '479469269015-ss8elerdhoi2911g10lbf2tic9qlje66.apps.googleusercontent.com',
       });
 
-      await GoogleSignin.hasPlayServices();
-      await GoogleSignin.signIn();
-      const { idToken } = await GoogleSignin.getTokens();
+      const response = await GoogleSignin.signIn();
 
+      // Kullanıcı iptal ettiyse sessizce çık
+      if (!response || !response.data) {
+        return false;
+      }
+
+      const idToken = response.data.idToken;
       if (!idToken) throw new Error('Google Sign-In: no ID token');
 
-      const { access_token } = await post<{ access_token: string }>('/auth/firebase-login', {
+      const { access_token } = await post<{ access_token: string }>('/auth/google-login', {
         id_token: idToken,
       });
       await this._finalizeLogin(access_token);
       return true;
     } catch (e: any) {
+      // Kullanıcı pencereyi kapattıysa hata gösterme
+      if (e?.code === 'SIGN_IN_CANCELLED' || e?.code === 'CANCELED' || e?.message?.includes('cancel')) {
+        return false;
+      }
       throw new Error(`Google login failed: ${e.message}`);
     }
   }
@@ -126,8 +146,8 @@ class AuthService {
       const { identityToken } = appleAuthRequestResponse;
       if (!identityToken) throw new Error('Apple Sign-In: no identity token');
 
-      const { access_token } = await post<{ access_token: string }>('/auth/firebase-login', {
-        id_token: identityToken,
+      const { access_token } = await post<{ access_token: string }>('/auth/apple-login', {
+        identity_token: identityToken,
         display_name:
           appleAuthRequestResponse.fullName?.givenName ?? undefined,
       });

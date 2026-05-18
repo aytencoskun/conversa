@@ -10,10 +10,10 @@ export type MainTabParamList = {
 export type RootStackParamList = {
     Login: undefined;
     Signup: undefined;
+    VerifyCode: { email: string };
     ForgotPassword: undefined;
     Settings: undefined;
     Notifications: undefined;
     MainTabs: undefined;
     MeetingDetail: { meetingId: string };
-    // Add other stack screens here if needed (e.g., Login, Onboarding)
 };

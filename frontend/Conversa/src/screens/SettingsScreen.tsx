@@ -43,13 +43,12 @@ const SettingItem = ({
 export default function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
 
-  // Mock State
+  // Gerçek kullanıcı verileri
+  const user = authService.getUser();
   const [spokenLang, setSpokenLang] = useState('English');
   const [targetLang, setTargetLang] = useState('Turkish');
   const [translationProvider, setTranslationProvider] = useState('LibreTranslate');
   const [summaryFormat, setSummaryFormat] = useState('Bullet Points');
-  const [userEmail] = useState('ayten@example.com');
-  const [storageUsed] = useState('1.2 GB / 5.0 GB');
 
   const handleLogout = async () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -81,7 +80,10 @@ export default function SettingsScreen() {
         {/* Account Section */}
         <View style={styles.section}>
           <SectionTitle title="Account" />
-          <SettingItem label="Email" value={userEmail} hasArrow={false} />
+          <SettingItem label="Email" value={user?.email || '—'} hasArrow={false} />
+          {user?.display_name && (
+            <SettingItem label="Display Name" value={user.display_name} hasArrow={false} />
+          )}
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <Icon name="log-out" size={20} color={colors.error} style={{ marginRight: 8 }} />
             <Text style={styles.logoutText}>Log Out</Text>
@@ -129,13 +131,11 @@ export default function SettingsScreen() {
           <Text style={styles.helperText}>Determines style of AI generated summaries.</Text>
         </View>
 
-        {/* Storage */}
+        {/* About */}
         <View style={styles.section}>
-          <SectionTitle title="Storage" />
-          <SettingItem label="Storage Used" value={storageUsed} hasArrow={false} />
-          <View style={styles.storageBarBg}>
-            <View style={[styles.storageBarFill, { width: '24%' }]} />
-          </View>
+          <SectionTitle title="About" />
+          <SettingItem label="Version" value="1.0.0" hasArrow={false} />
+          <Text style={styles.helperText}>Conversa — AI-Powered Meeting Assistant</Text>
         </View>
 
       </ScrollView>
@@ -232,5 +232,5 @@ const styles = StyleSheet.create({
   storageBarFill: {
     height: '100%',
     backgroundColor: colors.primary,
-  }
+  },
 });

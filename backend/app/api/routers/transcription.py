@@ -77,6 +77,7 @@ async def transcribe_websocket(websocket: WebSocket):
     transcript_segments: list[dict] = []    # {id, text, timestamp}
     translation_segments: list[dict] = []   # {id, original, translated, timestamp}
     segment_counter = 0
+    should_save_session = True
 
     async def run_intermediate_summarization():
         try:
@@ -191,10 +192,23 @@ async def transcribe_websocket(websocket: WebSocket):
                             translation_segments.clear()
                             segment_counter = 0
                             session_start_time = time.time()
+                            should_save_session = True
                             print("BACKEND: Session state reset via config")
                         
                         print(f"BACKEND: Config updated — {source_lang}->{target_lang} via {translation_provider}")
                         continue
+                    elif config.get("type") == "command":
+                        cmd = config.get("command")
+                        if cmd == "discard_session":
+                            should_save_session = False
+                            print("BACKEND: Session marked for discard.")
+                            await websocket.close()
+                            raise WebSocketDisconnect(1000)
+                        elif cmd == "save_session":
+                            should_save_session = True
+                            print("BACKEND: Session marked for save.")
+                            await websocket.close()
+                            raise WebSocketDisconnect(1000)
                 except (json.JSONDecodeError, KeyError):
                     pass
                 continue
@@ -291,47 +305,61 @@ async def transcribe_websocket(websocket: WebSocket):
         # Generate final AI summary and persist the session to MongoDB
         async def final_summary_and_save():
             try:
-                final_json = await summarization_manager.trigger_final_summary()
-                print("\n" + "="*50)
-                print("🚀 FINAL MEETING SUMMARY:")
-                print(json.dumps(final_json, indent=2, ensure_ascii=False))
-                print("="*50 + "\n")
-
-                # Send full summary to the client if still reachable
-                try:
-                    await websocket.send_text(json.dumps({
-                        "type": "final_summary",
-                        "summary": final_json,
-                    }))
-                except Exception:
-                    pass  # Client may have already disconnected
-
-                # ── Persist to MongoDB ──
                 session_duration = round(time.time() - session_start_time, 2)
+                col = get_sessions_collection()
+                
+                # 1. Insert initial document with processing status
                 session_doc = {
                     "title": f"Meeting {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}",
                     "created_at": datetime.now(timezone.utc).isoformat(),
                     "duration": session_duration,
                     "source_lang": source_lang,
                     "target_lang": target_lang,
-                    "status": "completed",
+                    "status": "processing",
                     "transcript": transcript_segments,
                     "translation": translation_segments,
-                    "summary": final_json,
+                    "summary": None,
                     "intermediate_summaries": summarization_manager.intermediate_summaries,
-                    "user_id": user_id,  # None if unauthenticated
+                    "user_id": user_id,
                 }
+                
                 try:
-                    col = get_sessions_collection()
                     result = await col.insert_one(session_doc)
-                    print(f"✅ Session saved to MongoDB → _id: {result.inserted_id}")
+                    inserted_id = result.inserted_id
+                    print(f"✅ Session saved as PROCESSING → _id: {inserted_id}")
                 except Exception as db_err:
-                    print(f"❌ MongoDB save failed: {db_err}")
+                    print(f"❌ MongoDB initial save failed: {db_err}")
+                    return
+
+                # 2. Trigger AI Summary (Takes 10-20 seconds)
+                final_json = await summarization_manager.trigger_final_summary()
+                
+                print("\n" + "="*50)
+                print("🚀 FINAL MEETING SUMMARY:")
+                print(json.dumps(final_json, indent=2, ensure_ascii=False))
+                print("="*50 + "\n")
+
+                # 3. Update document with final summary and completed status
+                try:
+                    from bson import ObjectId
+                    await col.update_one(
+                        {"_id": ObjectId(inserted_id)},
+                        {"$set": {
+                            "status": "completed",
+                            "summary": final_json
+                        }}
+                    )
+                    print(f"✅ Session updated to COMPLETED → _id: {inserted_id}")
+                except Exception as db_update_err:
+                    print(f"❌ MongoDB update failed: {db_update_err}")
 
             except Exception as e:
                 print(f"BACKEND: Final summary error: {e}")
         
-        asyncio.create_task(final_summary_and_save())
+        if should_save_session:
+            asyncio.create_task(final_summary_and_save())
+        else:
+            print("BACKEND: Session discarded by user request.")
 
     except Exception as e:
         silence_task.cancel()

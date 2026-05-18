@@ -8,18 +8,13 @@ import { typography } from '../theme/typography';
 // @ts-ignore
 import Icon from 'react-native-vector-icons/Feather';
 
-// Mock Data
-const NOTIFICATIONS = [
-    { id: '1', title: 'Meeting Processed', message: 'Your "Weekly Sync" meeting is ready for review.', time: '2 mins ago', isRead: false },
-    { id: '2', title: 'New Feature', message: 'Try out the new Translation tab in your meeting details.', time: '1 hour ago', isRead: false },
-    { id: '3', title: 'System Update', message: 'Conversa will be under maintenance tonight at 2 AM.', time: '1 day ago', isRead: true },
-    { id: '4', title: 'Welcome!', message: 'Thanks for joining Conversa. Start recording your first meeting.', time: '2 days ago', isRead: true },
-];
+// Gerçek bildirimler gelene kadar boş dizi — backend entegrasyonu ile doldurulacak
+const NOTIFICATIONS: any[] = [];
 
 export default function NotificationsScreen() {
     const navigation = useNavigation();
 
-    const renderItem = ({ item }: { item: typeof NOTIFICATIONS[0] }) => (
+    const renderItem = ({ item }: { item: any }) => (
         <TouchableOpacity style={[styles.card, !item.isRead && styles.unreadCard]}>
             <View style={styles.iconContainer}>
                 <Icon name={item.isRead ? "bell" : "bell-off"} size={20} color={item.isRead ? colors.textSecondary : colors.primary} />
@@ -41,20 +36,34 @@ export default function NotificationsScreen() {
                     <Icon name="arrow-left" size={24} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={styles.title}>Notifications</Text>
-                <TouchableOpacity style={styles.clearButton}>
-                    <Text style={styles.clearText}>Clear All</Text>
-                </TouchableOpacity>
+                <View style={{ width: 40 }} />
             </View>
 
             <FlatList
                 data={NOTIFICATIONS}
                 keyExtractor={item => item.id}
                 renderItem={renderItem}
-                contentContainerStyle={styles.listContent}
+                contentContainerStyle={[
+                    styles.listContent,
+                    NOTIFICATIONS.length === 0 && styles.emptyListContent,
+                ]}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
-                        <Icon name="bell" size={48} color={colors.border} />
-                        <Text style={styles.emptyText}>No notifications yet</Text>
+                        <View style={styles.emptyIconCircle}>
+                            <Icon name="bell" size={36} color={colors.primary} />
+                        </View>
+                        <Text style={styles.emptyTitle}>All caught up!</Text>
+                        <Text style={styles.emptySubtitle}>
+                            You don't have any notifications yet.{'\n'}
+                            We'll let you know when something{'\n'}
+                            interesting happens.
+                        </Text>
+                        <View style={styles.tipContainer}>
+                            <Icon name="mic" size={14} color={colors.primary} />
+                            <Text style={styles.tipText}>
+                                Start a recording to get notified{'\n'}when processing is complete
+                            </Text>
+                        </View>
                     </View>
                 }
             />
@@ -86,15 +95,12 @@ const styles = StyleSheet.create({
         fontWeight: typography.weights.bold,
         color: colors.text,
     },
-    clearButton: {
-        padding: 8,
-    },
-    clearText: {
-        fontSize: typography.sizes.s,
-        color: colors.primary,
-    },
     listContent: {
         padding: spacing.m,
+    },
+    emptyListContent: {
+        flex: 1,
+        justifyContent: 'center',
     },
     card: {
         flexDirection: 'row',
@@ -106,7 +112,7 @@ const styles = StyleSheet.create({
         borderColor: colors.border,
     },
     unreadCard: {
-        backgroundColor: '#F0F9F4', // Very light green
+        backgroundColor: '#F0F9F4',
         borderColor: colors.primary,
     },
     iconContainer: {
@@ -140,15 +146,47 @@ const styles = StyleSheet.create({
         color: colors.textSecondary,
         lineHeight: 18,
     },
+    // ── Empty State ──
     emptyContainer: {
-        flex: 1,
         alignItems: 'center',
-        justifyContent: 'center',
-        paddingTop: spacing.xl * 2,
+        paddingHorizontal: spacing.l,
     },
-    emptyText: {
-        marginTop: spacing.m,
+    emptyIconCircle: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: colors.gray,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: spacing.l,
+    },
+    emptyTitle: {
+        fontSize: typography.sizes.l,
+        fontWeight: typography.weights.bold as any,
+        color: colors.text,
+        marginBottom: spacing.s,
+    },
+    emptySubtitle: {
         fontSize: typography.sizes.m,
         color: colors.textSecondary,
+        textAlign: 'center',
+        lineHeight: 22,
+        marginBottom: spacing.l,
+    },
+    tipContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.surface,
+        paddingHorizontal: spacing.m,
+        paddingVertical: spacing.s,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    tipText: {
+        fontSize: typography.sizes.s,
+        color: colors.textSecondary,
+        marginLeft: spacing.s,
+        lineHeight: 18,
     },
 });

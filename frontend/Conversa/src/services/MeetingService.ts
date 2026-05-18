@@ -1,6 +1,6 @@
 import { Meeting } from '../types/meeting';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://192.168.1.174:8000';
 
 /**
  * Map a backend session document to the frontend Meeting type.

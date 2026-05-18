@@ -11,6 +11,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
+import VerifyCodeScreen from '../screens/VerifyCodeScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import HomeScreen from '../screens/HomeScreen';
 import MeetingDetailScreen from '../screens/MeetingDetailScreen';
@@ -88,6 +89,7 @@ export default function AppNavigation() {
         <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Login">
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Signup" component={SignupScreen} />
+          <Stack.Screen name="VerifyCode" component={VerifyCodeScreen} />
           <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           <Stack.Screen name="MainTabs" component={MainTabs} />
           <Stack.Screen name="Settings" component={SettingsScreen} />

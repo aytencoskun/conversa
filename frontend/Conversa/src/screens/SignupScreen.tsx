@@ -28,6 +28,7 @@ type SignupScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 
 
 export default function SignupScreen() {
     const navigation = useNavigation<SignupScreenNavigationProp>();
+    const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -35,7 +36,7 @@ export default function SignupScreen() {
     const [secureTextEntry, setSecureTextEntry] = useState(true);
 
     const handleSignup = async () => {
-        if (!email || !password || !confirmPassword) {
+        if (!fullName || !email || !password || !confirmPassword) {
             Alert.alert('Error', 'Please fill in all fields');
             return;
         }
@@ -47,13 +48,8 @@ export default function SignupScreen() {
 
         setIsLoading(true);
         try {
-            await authService.signup(email, password);
-            // Assuming success logs in automatically or asks to login
-            // For this flow, let's go to MainTabs
-            navigation.reset({
-                index: 0,
-                routes: [{ name: 'MainTabs' }],
-            });
+            await authService.signup(email, password, fullName);
+            navigation.navigate('VerifyCode', { email });
         } catch (error: any) {
             Alert.alert('Signup Failed', error.message);
         } finally {
@@ -61,10 +57,34 @@ export default function SignupScreen() {
         }
     };
 
+    const handleGoogleSignup = async () => {
+        setIsLoading(true);
+        try {
+            const success = await authService.googleLogin();
+            if (success) {
+                navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+            }
+        } catch (e: any) {
+            Alert.alert('Error', e.message || 'Google Sign-Up Failed');
+        } finally { setIsLoading(false); }
+    };
+
+    const handleAppleSignup = async () => {
+        setIsLoading(true);
+        try {
+            const success = await authService.appleLogin();
+            if (success) {
+                navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+            }
+        } catch (e: any) {
+            Alert.alert('Error', e.message || 'Apple Sign-Up Failed');
+        } finally { setIsLoading(false); }
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView
-                behavior="padding" // Optimized for iOS (Android behavior: 'height' commented out)
+                behavior="padding"
                 style={styles.keyboardView}
             >
                 <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -84,6 +104,19 @@ export default function SignupScreen() {
 
                         {/* Form */}
                         <View style={styles.formContainer}>
+                            {/* Full Name */}
+                            <View style={styles.inputContainer}>
+                                <Icon name="user" size={20} color={colors.textSecondary} style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Full Name"
+                                    placeholderTextColor={colors.textSecondary}
+                                    value={fullName}
+                                    onChangeText={setFullName}
+                                    autoCapitalize="words"
+                                />
+                            </View>
+
                             {/* Email */}
                             <View style={styles.inputContainer}>
                                 <Icon name="mail" size={20} color={colors.textSecondary} style={styles.inputIcon} />
@@ -139,6 +172,26 @@ export default function SignupScreen() {
                                     <Text style={styles.signupButtonText}>Create Account</Text>
                                 )}
                             </TouchableOpacity>
+
+                            {/* Divider */}
+                            <View style={styles.dividerContainer}>
+                                <View style={styles.line} />
+                                <Text style={styles.orText}>OR</Text>
+                                <View style={styles.line} />
+                            </View>
+
+                            {/* Social Login */}
+                            <View style={styles.socialContainer}>
+                                <TouchableOpacity style={styles.socialButton} onPress={handleGoogleSignup}>
+                                    <Icon name="globe" size={20} color={colors.text} />
+                                    <Text style={styles.socialButtonText}>Google</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity style={styles.socialButton} onPress={handleAppleSignup}>
+                                    <Icon name="command" size={20} color={colors.text} />
+                                    <Text style={styles.socialButtonText}>Apple</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
                         {/* Footer */}
@@ -223,6 +276,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: spacing.m,
+        marginBottom: spacing.l,
         shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
@@ -233,6 +287,43 @@ const styles = StyleSheet.create({
         color: colors.onPrimary,
         fontSize: typography.sizes.m,
         fontWeight: typography.weights.bold as any,
+    },
+    dividerContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: spacing.l,
+    },
+    line: {
+        flex: 1,
+        height: 1,
+        backgroundColor: colors.border,
+    },
+    orText: {
+        marginHorizontal: spacing.m,
+        color: colors.textSecondary,
+        fontSize: typography.sizes.s,
+    },
+    socialContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: spacing.xl,
+    },
+    socialButton: {
+        flex: 1,
+        flexDirection: 'row',
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: 12,
+        height: 56,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginHorizontal: 8,
+    },
+    socialButtonText: {
+        marginLeft: 8,
+        color: colors.text,
+        fontWeight: typography.weights.medium as any,
     },
     footer: {
         flexDirection: 'row',

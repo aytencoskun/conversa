@@ -60,20 +60,24 @@ export default function LoginScreen() {
     const handleGoogleLogin = async () => {
         setIsLoading(true);
         try {
-            await authService.googleLogin();
-            navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
-        } catch (e) {
-            Alert.alert('Error', 'Google Login Failed');
+            const success = await authService.googleLogin();
+            if (success) {
+                navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+            }
+        } catch (e: any) {
+            Alert.alert('Error', e.message || 'Google Login Failed');
         } finally { setIsLoading(false); }
     };
 
     const handleAppleLogin = async () => {
         setIsLoading(true);
         try {
-            await authService.appleLogin();
-            navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
-        } catch (e) {
-            Alert.alert('Error', 'Apple Login Failed');
+            const success = await authService.appleLogin();
+            if (success) {
+                navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+            }
+        } catch (e: any) {
+            Alert.alert('Error', e.message || 'Apple Login Failed');
         } finally { setIsLoading(false); }
     };
 

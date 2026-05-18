@@ -1,35 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    FlatList,
     Dimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { RootStackParamList, MainTabParamList } from '../types/navigation';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { RootStackParamList } from '../types/navigation';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
 // @ts-ignore
 import Icon from 'react-native-vector-icons/Feather';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { authService } from '../services/AuthService';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-// Mock Data
-const RECENT_RECORDINGS = [
-    { id: '1', title: 'Product Design Sync', date: 'Today, 10:00 AM', duration: '45:00', status: 'processing' },
-    { id: '2', title: 'Client Interview', date: 'Yesterday, 2:30 PM', duration: '23:15', status: 'completed' },
-    { id: '3', title: 'Idea Brainstorm', date: 'Oct 24, 9:00 AM', duration: '12:05', status: 'completed' },
-];
-
 export default function HomeScreen() {
     const navigation = useNavigation<HomeScreenNavigationProp>();
+    const [recordings, setRecordings] = useState<any[]>([]);
+    const [displayName, setDisplayName] = useState('');
+    const [totalDuration, setTotalDuration] = useState('0m');
+    const [summaryCount, setSummaryCount] = useState(0);
+
+    // Kullanıcı bilgilerini yükle
+    useFocusEffect(
+        useCallback(() => {
+            const user = authService.getUser();
+            if (user) {
+                setDisplayName(user.display_name || user.email?.split('@')[0] || 'there');
+            }
+            // TODO: Backend'den gerçek kayıtları çek
+            // setRecordings(...)
+        }, [])
+    );
 
     // Helper to render status badge
     const renderStatus = (status: string) => {
@@ -44,8 +52,8 @@ export default function HomeScreen() {
         );
     };
 
-    const renderItem = ({ item }: { item: typeof RECENT_RECORDINGS[0] }) => (
-        <TouchableOpacity style={styles.card}>
+    const renderItem = (item: any) => (
+        <TouchableOpacity style={styles.card} key={item.id}>
             <View style={styles.cardHeader}>
                 <View style={styles.iconContainer}>
                     <Icon name="mic" size={18} color={colors.primary} />
@@ -66,7 +74,7 @@ export default function HomeScreen() {
                 {/* Header */}
                 <View style={styles.header}>
                     <View>
-                        <Text style={styles.greeting}>Hello, Ayten</Text>
+                        <Text style={styles.greeting}>Hello, {displayName} 👋</Text>
                         <Text style={styles.subGreeting}>Ready to capture your thoughts?</Text>
                     </View>
                     <View style={styles.headerRight}>
@@ -75,7 +83,6 @@ export default function HomeScreen() {
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('Notifications')}>
                             <Icon name="bell" size={24} color={colors.text} />
-                            <View style={styles.badge} />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -87,7 +94,7 @@ export default function HomeScreen() {
                             <Icon name="clock" size={20} color={colors.primary} />
                         </View>
                         <View>
-                            <Text style={styles.statValue}>12h 45m</Text>
+                            <Text style={styles.statValue}>{totalDuration}</Text>
                             <Text style={styles.statLabel}>Recorded this month</Text>
                         </View>
                     </View>
@@ -97,7 +104,9 @@ export default function HomeScreen() {
                             <Icon name="file-text" size={20} color="#5C4033" />
                         </View>
                         <View>
-                            <Text style={[styles.statValue, { color: '#5C4033' }]}>5 Summaries</Text>
+                            <Text style={[styles.statValue, { color: '#5C4033' }]}>
+                                {summaryCount} {summaryCount === 1 ? 'Summary' : 'Summaries'}
+                            </Text>
                             <Text style={[styles.statLabel, { color: '#8D6E63' }]}>Generated this week</Text>
                         </View>
                     </View>
@@ -106,31 +115,42 @@ export default function HomeScreen() {
                 {/* Recent Recordings */}
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Recent Recordings</Text>
-                    <TouchableOpacity>
-                        <Text style={styles.seeAll}>See All</Text>
-                    </TouchableOpacity>
+                    {recordings.length > 0 && (
+                        <TouchableOpacity>
+                            <Text style={styles.seeAll}>See All</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
 
-                {RECENT_RECORDINGS.map((item) => (
-                    <View key={item.id} style={{ marginBottom: spacing.m }}>
-                        {renderItem({ item })}
+                {recordings.length > 0 ? (
+                    recordings.map((item) => (
+                        <View key={item.id} style={{ marginBottom: spacing.m }}>
+                            {renderItem(item)}
+                        </View>
+                    ))
+                ) : (
+                    /* ── Empty State ── */
+                    <View style={styles.emptyState}>
+                        <View style={styles.emptyIconCircle}>
+                            <Icon name="mic" size={32} color={colors.primary} />
+                        </View>
+                        <Text style={styles.emptyTitle}>No recordings yet</Text>
+                        <Text style={styles.emptySubtitle}>
+                            Tap the microphone button below to{'\n'}start your first recording session!
+                        </Text>
+                        <View style={styles.tipContainer}>
+                            <Icon name="info" size={14} color={colors.primary} />
+                            <Text style={styles.tipText}>
+                                Conversa will transcribe, translate and{'\n'}summarize your audio automatically
+                            </Text>
+                        </View>
                     </View>
-                ))}
+                )}
 
-                {/* Space for FAB / Tab Bar */}
+                {/* Space for Tab Bar */}
                 <View style={{ height: 100 }} />
 
             </ScrollView>
-
-            {/* Floating Action Button (Alternative to Tab Bar center button if needed, but sticking to Tab bar is usually UX standard. 
-            However, user requested "Alt Bölüm (Action Button - FAB)". 
-            If I place it here, it might overlap tab bar.
-            I will rely on the Tab Bar "Record" button as the primary action, but maybe add a smaller quick action here?
-            Actually the user said "Large, attention-grabbing Microphone button".
-            Let's assume the Tab Bar middle button IS that button. But to be safe, I'll add a visual cue or a specific FAB if the tab bar isn't enough.
-            Let's stick to the Tab Bar for now to avoid specific layout collisions. 
-        */}
-
         </SafeAreaView>
     );
 }
@@ -174,17 +194,6 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: colors.border,
     },
-    badge: {
-        position: 'absolute',
-        top: 10,
-        right: 12,
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: colors.error,
-        borderWidth: 1,
-        borderColor: colors.surface,
-    },
     statsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -195,7 +204,7 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: spacing.m,
         marginHorizontal: 4,
-        height: 120, // Taller card
+        height: 120,
         justifyContent: 'space-between',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
@@ -271,7 +280,7 @@ const styles = StyleSheet.create({
         marginBottom: 2,
     },
     cardDate: {
-        fontSize: typography.sizes.s, // Using s (14) instead of xs (12) for better readability
+        fontSize: typography.sizes.s,
         color: colors.textSecondary,
     },
     statusBadge: {
@@ -294,7 +303,51 @@ const styles = StyleSheet.create({
         marginRight: 6,
     },
     statusText: {
-        fontSize: 10, // Small text
+        fontSize: 10,
         fontWeight: '600',
+    },
+    // ── Empty State ──
+    emptyState: {
+        alignItems: 'center',
+        paddingVertical: spacing.xl * 1.5,
+        paddingHorizontal: spacing.l,
+    },
+    emptyIconCircle: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: colors.gray,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: spacing.l,
+    },
+    emptyTitle: {
+        fontSize: typography.sizes.l,
+        fontWeight: typography.weights.bold as any,
+        color: colors.text,
+        marginBottom: spacing.s,
+    },
+    emptySubtitle: {
+        fontSize: typography.sizes.m,
+        color: colors.textSecondary,
+        textAlign: 'center',
+        lineHeight: 22,
+        marginBottom: spacing.l,
+    },
+    tipContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.surface,
+        paddingHorizontal: spacing.m,
+        paddingVertical: spacing.s,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    tipText: {
+        fontSize: typography.sizes.s,
+        color: colors.textSecondary,
+        marginLeft: spacing.s,
+        lineHeight: 18,
     },
 });

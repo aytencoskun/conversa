@@ -23,6 +23,7 @@ export default function RecordScreen() {
   const [direction, setDirection] = useState<'EN_TO_TR' | 'TR_TO_EN'>('EN_TO_TR');
   const [currentSummary, setCurrentSummary] = useState('');
   const [showSummaryPopup, setShowSummaryPopup] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
   const originalScrollRef = useRef<ScrollView>(null);
   const translationScrollRef = useRef<ScrollView>(null);
 
@@ -137,7 +138,20 @@ export default function RecordScreen() {
 
   const handleDefinitiveStop = () => {
     stopRecording();
-    setIsSessionActive(false); // Next start will clear the screen
+    setShowSaveDialog(true);
+  };
+
+  const handleSaveSession = () => {
+    audioWebSocket.send(JSON.stringify({ type: 'command', command: 'save_session' }));
+    setShowSaveDialog(false);
+    setIsSessionActive(false);
+    Alert.alert('Toplantı Kaydediliyor', 'Yapay zeka özeti çıkarılıyor ve oturum geçmişe kaydediliyor.');
+  };
+
+  const handleDiscardSession = () => {
+    audioWebSocket.send(JSON.stringify({ type: 'command', command: 'discard_session' }));
+    setShowSaveDialog(false);
+    setIsSessionActive(false);
   };
 
   return (
@@ -248,6 +262,24 @@ export default function RecordScreen() {
           </LinearGradient>
         </TouchableOpacity>
       </View>
+
+      {/* Save Session Dialog */}
+      {showSaveDialog && (
+        <View style={styles.saveDialogContainer}>
+          <Text style={styles.saveDialogTitle}>Toplantı Kaydedilsin mi?</Text>
+          <Text style={styles.saveDialogText}>
+            Evet'e tıklarsanız yapay zeka detaylı bir özet çıkaracak ve konuşma Geçmiş sekmesine kaydedilecektir.
+          </Text>
+          <View style={styles.saveDialogButtons}>
+            <TouchableOpacity style={[styles.saveDialogBtn, styles.discardBtn]} onPress={handleDiscardSession}>
+              <Text style={styles.discardBtnText}>Hayır, Sil</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.saveDialogBtn, styles.saveBtn]} onPress={handleSaveSession}>
+              <Text style={styles.saveBtnText}>Evet, Kaydet</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -449,5 +481,60 @@ const styles = StyleSheet.create({
     color: '#E8F5E9',
     fontSize: typography.sizes.s,
     lineHeight: 20,
+  },
+  saveDialogContainer: {
+    backgroundColor: colors.surface,
+    padding: spacing.m,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 10,
+    marginTop: spacing.s,
+    marginBottom: spacing.l,
+    borderWidth: 1,
+    borderColor: colors.primary + '30',
+  },
+  saveDialogTitle: {
+    fontSize: typography.sizes.m,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+    marginBottom: spacing.s,
+    textAlign: 'center',
+  },
+  saveDialogText: {
+    fontSize: typography.sizes.s,
+    color: colors.textSecondary,
+    marginBottom: spacing.m,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  saveDialogButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  saveDialogBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  discardBtn: {
+    backgroundColor: '#FFEAEA',
+    marginRight: spacing.s,
+  },
+  saveBtn: {
+    backgroundColor: colors.primary,
+    marginLeft: spacing.s,
+  },
+  discardBtnText: {
+    color: '#D32F2F',
+    fontWeight: typography.weights.bold,
+  },
+  saveBtnText: {
+    color: '#FFF',
+    fontWeight: typography.weights.bold,
   },
 });

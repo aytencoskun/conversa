@@ -22,7 +22,7 @@ class STTService:
         segments, info = self.model.transcribe(
             audio_chunk, 
             beam_size=1, 
-            vad_filter=True,
+            vad_filter=False,
             initial_prompt=initial_prompt,
             language=language
         )
